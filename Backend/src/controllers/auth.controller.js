@@ -1,66 +1,53 @@
 import { generateToken } from "../lib/utils.js";
 import User from "../models/user.model.js";
-import bcryptjs from "bcryptjs";
-import validator from "validator";
-
-export const validateSignupData = (req) => {
-  const { fullname, email, password } = req.body;
-
-  if (!fullname || !email || !password) {
-    return { error: "All fields are required" };
-  }
-
-  if (!validator.isEmail(email)) {
-    return { error: "Invalid email address" };
-  }
-
-  if (password.length < 6) {
-    return { error: "Password must be at least 6 characters" };
-  }
-
-  return { valid: true };
-};
+import bcrypt from "bcryptjs";
 
 export const signup = async (req, res) => {
-  const validation = validateSignupData(req);
-
-  if (!validation.valid) {
-    return res.status(400).json({ message: validation.error });
-  }
-
+  const { fullName, email, password } = req.body;
   try {
-    const { fullname, email, password } = req.body;
+    if (
+      fullName.trim() === "" ||
+      email.trim() === "" ||
+      password.trim() === ""
+    ) {
+      return res.status(400).json({ message: "All fields must not be empty" });
+    }
+
+    if (password.length < 6) {
+      return res
+        .status(400)
+        .json({ message: "Password must be at least 6 characters" });
+    }
 
     const user = await User.findOne({ email });
 
-    if (user) {
-      return res.status(400).json({ message: "Email already exists" });
-    }
+    if (user) return res.status(400).json({ message: "Email already exists" });
 
-    const salt = await bcryptjs.genSalt(10);
-    const hashedPassword = await bcryptjs.hash(password, salt);
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
 
     const newUser = new User({
-      fullname,
+      fullName,
       email,
       password: hashedPassword,
     });
 
     if (newUser) {
+      // generate jwt token here
       generateToken(newUser._id, res);
       await newUser.save();
 
       res.status(201).json({
-        id: newUser._id,
-        fullname: newUser.fullname,
+        _id: newUser._id,
+        fullName: newUser.fullName,
         email: newUser.email,
-        profilepic: newUser.profilepic,
+        profilePic: newUser.profilePic,
       });
     } else {
-      return res.status(400).json({ message: "Invalid user data" });
+      res.status(400).json({ message: "Invalid user data" });
     }
-  } catch (err) {
-    console.error("Error during signup ", err.message);
+  } catch (error) {
+    console.log("Error in signup controller", error.message);
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
